@@ -1,101 +1,410 @@
-import Image from "next/image";
+// src/app/page.js
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sun,
+  Cloud,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  Wind,
+} from "lucide-react";
+
+export default function WeatherApp() {
+  // State for the search input, weather data, loading state, and errors
+  const [city, setCity] = useState("");
+  const [weatherData, setWeatherData] = useState(null);
+  const [forecastData, setForecastData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [darkMode, setDarkMode] = useState(false);
+  const { toast } = useToast();
+
+  // Load last searched city from localStorage on mount
+  useEffect(() => {
+    // Check if code is running in the browser
+    if (typeof window !== "undefined") {
+      const savedCity = localStorage.getItem("lastSearchedCity");
+      const savedTheme = localStorage.getItem("darkMode");
+
+      if (savedTheme === "true") {
+        setDarkMode(true);
+        document.documentElement.classList.add("dark");
+      }
+
+      if (savedCity) {
+        setCity(savedCity);
+        fetchWeatherData(savedCity);
+      }
+    }
+  }, []);
+
+  // OpenWeather API key and endpoints
+  const API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY; // Get from .env.local
+  const WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/weather";
+  const FORECAST_API_URL = "https://api.openweathermap.org/data/2.5/forecast";
+
+  // Function to fetch weather data
+  const fetchWeatherData = async (cityName) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Fetch current weather
+      const weatherResponse = await fetch(
+        `${WEATHER_API_URL}?q=${cityName}&units=metric&appid=${API_KEY}`
+      );
+
+      if (!weatherResponse.ok) {
+        throw new Error(
+          weatherResponse.status === 404
+            ? "City not found. Please check the spelling and try again."
+            : "Failed to fetch weather data. Please try again later."
+        );
+      }
+
+      const weatherResult = await weatherResponse.json();
+      setWeatherData(weatherResult);
+
+      // Save to localStorage
+      localStorage.setItem("lastSearchedCity", cityName);
+
+      // Fetch 5-day forecast
+      const forecastResponse = await fetch(
+        `${FORECAST_API_URL}?q=${cityName}&units=metric&appid=${API_KEY}`
+      );
+
+      if (!forecastResponse.ok) {
+        throw new Error("Failed to fetch forecast data.");
+      }
+
+      const forecastResult = await forecastResponse.json();
+
+      // Process forecast data to get daily forecasts
+      const dailyForecasts = processForecastData(forecastResult.list);
+      setForecastData(dailyForecasts);
+    } catch (err) {
+      setError(err.message);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to process the 5-day forecast data
+  const processForecastData = (forecastList) => {
+    // Group forecasts by day
+    const dailyData = {};
+
+    forecastList.forEach((forecast) => {
+      const date = new Date(forecast.dt * 1000).toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+
+      if (!dailyData[date]) {
+        dailyData[date] = {
+          date,
+          temperatures: [],
+          weatherIcons: [],
+          descriptions: [],
+        };
+      }
+
+      dailyData[date].temperatures.push(forecast.main.temp);
+      dailyData[date].weatherIcons.push(forecast.weather[0].icon);
+      dailyData[date].descriptions.push(forecast.weather[0].description);
+    });
+
+    // Convert to array and calculate averages
+    return Object.values(dailyData)
+      .map((day) => {
+        const avgTemp =
+          day.temperatures.reduce((sum, temp) => sum + temp, 0) /
+          day.temperatures.length;
+
+        // Get the most frequent weather condition
+        const countMap = {};
+        let maxCount = 0;
+        let mostFrequentIndex = 0;
+
+        day.weatherIcons.forEach((icon, index) => {
+          countMap[icon] = (countMap[icon] || 0) + 1;
+          if (countMap[icon] > maxCount) {
+            maxCount = countMap[icon];
+            mostFrequentIndex = index;
+          }
+        });
+
+        return {
+          date: day.date,
+          avgTemp: avgTemp.toFixed(1),
+          icon: day.weatherIcons[mostFrequentIndex],
+          description: day.descriptions[mostFrequentIndex],
+        };
+      })
+      .slice(0, 5); // Ensure we only get 5 days
+  };
+
+  // Handle form submission
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (city.trim()) {
+      fetchWeatherData(city.trim());
+    }
+  };
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    localStorage.setItem("darkMode", newDarkMode.toString());
+
+    if (newDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+
+  // Function to get weather icon based on weather condition
+  const getWeatherIcon = (iconCode) => {
+    const iconMap = {
+      "01d": <Sun className="h-12 w-12 text-yellow-500" />,
+      "01n": <Sun className="h-12 w-12 text-gray-300" />,
+      "02d": <Cloud className="h-12 w-12 text-gray-400" />,
+      "02n": <Cloud className="h-12 w-12 text-gray-500" />,
+      "03d": <Cloud className="h-12 w-12 text-gray-400" />,
+      "03n": <Cloud className="h-12 w-12 text-gray-500" />,
+      "04d": <Cloud className="h-12 w-12 text-gray-400" />,
+      "04n": <Cloud className="h-12 w-12 text-gray-500" />,
+      "09d": <CloudRain className="h-12 w-12 text-blue-400" />,
+      "09n": <CloudRain className="h-12 w-12 text-blue-500" />,
+      "10d": <CloudRain className="h-12 w-12 text-blue-400" />,
+      "10n": <CloudRain className="h-12 w-12 text-blue-500" />,
+      "11d": <CloudLightning className="h-12 w-12 text-yellow-400" />,
+      "11n": <CloudLightning className="h-12 w-12 text-yellow-500" />,
+      "13d": <CloudSnow className="h-12 w-12 text-gray-200" />,
+      "13n": <CloudSnow className="h-12 w-12 text-gray-300" />,
+      "50d": <Wind className="h-12 w-12 text-gray-400" />,
+      "50n": <Wind className="h-12 w-12 text-gray-500" />,
+    };
+
+    return iconMap[iconCode] || <Cloud className="h-12 w-12 text-gray-400" />;
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div
+      className={`min-h-screen p-4 md:p-8 ${
+        darkMode ? "dark bg-gray-900 text-white" : "bg-gray-100"
+      }`}
+    >
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Weather App</h1>
+          <Button
+            variant="outline"
+            onClick={toggleDarkMode}
+            className="rounded-full"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            {darkMode ? "Light Mode" : "Dark Mode"}
+          </Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        <form onSubmit={handleSubmit} className="flex gap-2 mb-6">
+          <Input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Enter city name..."
+            className="w-full"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? "Searching..." : "Search"}
+          </Button>
+        </form>
+
+        {isLoading ? (
+          <Card className="w-full mb-6">
+            <CardHeader>
+              <Skeleton className="h-8 w-3/4 mb-2" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Skeleton className="h-16 w-16 rounded-full mr-4" />
+                <div>
+                  <Skeleton className="h-6 w-20 mb-2" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : weatherData ? (
+          <Tabs defaultValue="current" className="w-full mb-6">
+            <TabsList className="mb-4">
+              <TabsTrigger value="current">Current Weather</TabsTrigger>
+              <TabsTrigger value="forecast">5-Day Forecast</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="current">
+              <Card
+                className={`w-full ${
+                  darkMode ? "bg-gray-800 text-white border-gray-700" : ""
+                }`}
+              >
+                <CardHeader>
+                  <CardTitle className="flex justify-between items-center">
+                    <span>
+                      {weatherData.name}, {weatherData.sys.country}
+                    </span>
+                    <span className="text-sm opacity-70">
+                      {new Date().toLocaleDateString("en-US", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex items-center">
+                      {getWeatherIcon(weatherData.weather[0].icon)}
+                      <div className="ml-4">
+                        <h2 className="text-4xl font-bold">
+                          {Math.round(weatherData.main.temp)}°C
+                        </h2>
+                        <p className="capitalize text-lg">
+                          {weatherData.weather[0].description}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-4 md:mt-0 md:ml-auto">
+                      <div>
+                        <p className="text-sm opacity-70">Feels like</p>
+                        <p className="font-semibold">
+                          {Math.round(weatherData.main.feels_like)}°C
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm opacity-70">Humidity</p>
+                        <p className="font-semibold">
+                          {weatherData.main.humidity}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm opacity-70">Wind</p>
+                        <p className="font-semibold">
+                          {Math.round(weatherData.wind.speed)} m/s
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm opacity-70">Pressure</p>
+                        <p className="font-semibold">
+                          {weatherData.main.pressure} hPa
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="forecast">
+              {forecastData ? (
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  {forecastData.map((day, index) => (
+                    <Card
+                      key={index}
+                      className={`${
+                        darkMode ? "bg-gray-800 text-white border-gray-700" : ""
+                      }`}
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">{day.date}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-center pb-4">
+                        <div className="flex justify-center">
+                          {getWeatherIcon(day.icon)}
+                        </div>
+                        <p className="text-2xl font-bold mt-2">
+                          {day.avgTemp}°C
+                        </p>
+                        <p className="capitalize text-sm mt-1">
+                          {day.description}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p>No forecast data available</p>
+              )}
+            </TabsContent>
+          </Tabs>
+        ) : error ? (
+          <Card
+            className={`w-full p-4 ${
+              darkMode ? "bg-red-900" : "bg-red-50"
+            } border ${
+              darkMode ? "border-red-800" : "border-red-200"
+            } rounded-md mb-6`}
+          >
+            <p className={`${darkMode ? "text-red-200" : "text-red-500"}`}>
+              {error}
+            </p>
+          </Card>
+        ) : (
+          <Card
+            className={`w-full text-center p-8 ${
+              darkMode ? "bg-gray-800 text-white border-gray-700" : ""
+            }`}
+          >
+            <p className="text-lg mb-2">Welcome to the Weather App!</p>
+            <p>Search for a city to get the current weather conditions.</p>
+          </Card>
+        )}
+
+        <Card
+          className={`w-full mt-8 ${
+            darkMode ? "bg-gray-800 text-white border-gray-700" : ""
+          }`}
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <CardHeader>
+            <CardTitle className="text-lg">About This App</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              This weather application uses the OpenWeather API to provide
+              current weather conditions and 5-day forecasts for cities
+              worldwide. Built with Next.js, Shadcn UI components, and Tailwind
+              CSS.
+            </p>
+          </CardContent>
+          <CardFooter className="text-sm opacity-70">
+            <p>Data provided by OpenWeather</p>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 }
