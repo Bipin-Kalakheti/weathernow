@@ -12,7 +12,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sun,
@@ -31,7 +31,6 @@ export default function WeatherApp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
-  const { toast } = useToast();
 
   // Load last searched city from localStorage on mount
   useEffect(() => {
