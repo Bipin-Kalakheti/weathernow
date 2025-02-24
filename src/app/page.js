@@ -38,11 +38,7 @@ export default function WeatherApp() {
     if (typeof window !== "undefined") {
       const savedCity = localStorage.getItem("lastSearchedCity");
       const savedTheme = localStorage.getItem("darkMode");
-
-      if (savedTheme === "true") {
-        setDarkMode(true);
-        document.documentElement.classList.add("dark");
-      }
+      setDarkMode(savedTheme === "true");
 
       if (savedCity) {
         setCity(savedCity);
@@ -60,6 +56,8 @@ export default function WeatherApp() {
   const fetchWeatherData = async (cityName) => {
     setIsLoading(true);
     setError(null);
+
+    const loadingId = toast.loading(`Fetching weather data for ${cityName}...`);
 
     try {
       // Fetch current weather
@@ -91,17 +89,21 @@ export default function WeatherApp() {
       }
 
       const forecastResult = await forecastResponse.json();
-
-      // Process forecast data to get daily forecasts
       const dailyForecasts = processForecastData(forecastResult.list);
       setForecastData(dailyForecasts);
-    } catch (err) {
-      setError(err.message);
-      toast({
-        title: "Error",
-        description: err.message,
-        variant: "destructive",
+
+      toast.dismiss(loadingId);
+      toast.success(`Weather data for ${cityName}`, {
+        description: `Current temperature: ${Math.round(
+          weatherResult.main.temp
+        )}°C`,
       });
+    } catch (err) {
+      toast.dismiss(loadingId);
+      toast.error("Error", {
+        description: err.message,
+      });
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -179,8 +181,16 @@ export default function WeatherApp() {
 
     if (newDarkMode) {
       document.documentElement.classList.add("dark");
+      toast("Theme Changed", {
+        description: "Dark mode enabled",
+        icon: "🌙",
+      });
     } else {
       document.documentElement.classList.remove("dark");
+      toast("Theme Changed", {
+        description: "Light mode enabled",
+        icon: "☀️",
+      });
     }
   };
 
