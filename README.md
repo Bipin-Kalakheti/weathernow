@@ -2,6 +2,8 @@
 
 A modern weather application built with Next.js 15 that provides current weather conditions and 5-day forecasts for cities worldwide.
 
+**Live Demo:** [https://weathernow-beta.vercel.app/](https://weathernow-beta.vercel.app/)
+
 ## Features
 
 - **Current Weather Data**: Get real-time weather information including temperature, feels-like temperature, humidity, wind speed, and pressure
