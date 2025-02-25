@@ -31,6 +31,7 @@ export default function WeatherApp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [selectedForecast, setSelectedForecast] = useState(null);
 
   // Load last searched city from localStorage on mount
   useEffect(() => {
@@ -125,43 +126,70 @@ export default function WeatherApp() {
         dailyData[date] = {
           date,
           temperatures: [],
+          temp_min: forecast.main.temp_min,
+          temp_max: forecast.main.temp_max,
+          humidity: [],
+          wind: [],
+          pressure: [],
           weatherIcons: [],
           descriptions: [],
+          hourlyForecasts: [], // Add hourly data
         };
       }
 
       dailyData[date].temperatures.push(forecast.main.temp);
+      dailyData[date].temp_min = Math.min(
+        dailyData[date].temp_min,
+        forecast.main.temp_min
+      );
+      dailyData[date].temp_max = Math.max(
+        dailyData[date].temp_max,
+        forecast.main.temp_max
+      );
+      dailyData[date].humidity.push(forecast.main.humidity);
+      dailyData[date].wind.push(forecast.wind.speed);
+      dailyData[date].pressure.push(forecast.main.pressure);
       dailyData[date].weatherIcons.push(forecast.weather[0].icon);
       dailyData[date].descriptions.push(forecast.weather[0].description);
+
+      // Add hourly forecast data
+      dailyData[date].hourlyForecasts.push({
+        time: new Date(forecast.dt * 1000).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        temp: forecast.main.temp,
+        icon: forecast.weather[0].icon,
+        description: forecast.weather[0].description,
+        humidity: forecast.main.humidity,
+        wind: forecast.wind.speed,
+        pressure: forecast.main.pressure,
+      });
     });
 
     // Convert to array and calculate averages
     return Object.values(dailyData)
-      .map((day) => {
-        const avgTemp =
+      .map((day) => ({
+        date: day.date,
+        avgTemp: (
           day.temperatures.reduce((sum, temp) => sum + temp, 0) /
-          day.temperatures.length;
-
-        // Get the most frequent weather condition
-        const countMap = {};
-        let maxCount = 0;
-        let mostFrequentIndex = 0;
-
-        day.weatherIcons.forEach((icon, index) => {
-          countMap[icon] = (countMap[icon] || 0) + 1;
-          if (countMap[icon] > maxCount) {
-            maxCount = countMap[icon];
-            mostFrequentIndex = index;
-          }
-        });
-
-        return {
-          date: day.date,
-          avgTemp: avgTemp.toFixed(1),
-          icon: day.weatherIcons[mostFrequentIndex],
-          description: day.descriptions[mostFrequentIndex],
-        };
-      })
+          day.temperatures.length
+        ).toFixed(1),
+        minTemp: Math.round(day.temp_min),
+        maxTemp: Math.round(day.temp_max),
+        avgHumidity: Math.round(
+          day.humidity.reduce((sum, h) => sum + h, 0) / day.humidity.length
+        ),
+        avgWind: (
+          day.wind.reduce((sum, w) => sum + w, 0) / day.wind.length
+        ).toFixed(1),
+        avgPressure: Math.round(
+          day.pressure.reduce((sum, p) => sum + p, 0) / day.pressure.length
+        ),
+        icon: day.weatherIcons[Math.floor(day.weatherIcons.length / 2)],
+        description: day.descriptions[Math.floor(day.descriptions.length / 2)],
+        hourlyForecasts: day.hourlyForecasts,
+      }))
       .slice(0, 5); // Ensure we only get 5 days
   };
 
@@ -346,7 +374,8 @@ export default function WeatherApp() {
                       key={index}
                       className={`${
                         darkMode ? "bg-gray-800 text-white border-gray-700" : ""
-                      }`}
+                      } cursor-pointer transform transition-transform hover:scale-105`}
+                      onClick={() => setSelectedForecast(day)}
                     >
                       <CardHeader className="pb-2">
                         <CardTitle className="text-lg">{day.date}</CardTitle>
@@ -358,6 +387,10 @@ export default function WeatherApp() {
                         <p className="text-2xl font-bold mt-2">
                           {day.avgTemp}°C
                         </p>
+                        <div className="flex justify-center gap-2 text-sm opacity-70 mt-1">
+                          <span>↓ {day.minTemp}°C</span>
+                          <span>↑ {day.maxTemp}°C</span>
+                        </div>
                         <p className="capitalize text-sm mt-1">
                           {day.description}
                         </p>
@@ -367,6 +400,78 @@ export default function WeatherApp() {
                 </div>
               ) : (
                 <p>No forecast data available</p>
+              )}
+
+              {selectedForecast && (
+                <Card
+                  className={`mt-6 ${
+                    darkMode ? "bg-gray-800 text-white border-gray-700" : ""
+                  }`}
+                >
+                  <CardHeader>
+                    <CardTitle className="flex justify-between items-center">
+                      <span>Detailed Forecast for {selectedForecast.date}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedForecast(null)}
+                      >
+                        ✕
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <p className="text-sm opacity-70">Humidity</p>
+                          <p className="font-semibold">
+                            {selectedForecast.avgHumidity}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm opacity-70">Wind Speed</p>
+                          <p className="font-semibold">
+                            {selectedForecast.avgWind} m/s
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm opacity-70">Pressure</p>
+                          <p className="font-semibold">
+                            {selectedForecast.avgPressure} hPa
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-4">
+                          Hourly Forecast
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {selectedForecast.hourlyForecasts.map((hour, idx) => (
+                            <div
+                              key={idx}
+                              className="text-center p-2 rounded-lg bg-opacity-10 bg-gray-500"
+                            >
+                              <p className="text-sm font-semibold">
+                                {hour.time}
+                              </p>
+                              <div className="flex justify-center my-1">
+                                {getWeatherIcon(hour.icon)}
+                              </div>
+                              <p className="text-lg font-bold">
+                                {Math.round(hour.temp)}°C
+                              </p>
+                              <p className="text-xs opacity-70">
+                                {hour.humidity}% humidity
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
           </Tabs>
