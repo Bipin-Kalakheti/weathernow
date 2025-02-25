@@ -74,3 +74,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+.error-toast [data-description] {
+  color: #991b1b !important; /* Dark red for description text */
+}
+
+.theme-toast-dark [data-description] {
+  color: #d1d5db !important; /* Light gray for dark mode description */
+}
+
+.theme-toast-light [data-description] {
+  color: #4b5563 !important; /* Dark gray for light mode description */
+}
