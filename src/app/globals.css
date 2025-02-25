@@ -86,3 +86,7 @@
 .theme-toast-light [data-description] {
   color: #4b5563 !important; /* Dark gray for light mode description */
 }
+
+.success-toast [data-description] {
+  color: #166534 !important; /* Dark green for description text */
+}

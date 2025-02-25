@@ -67,6 +67,14 @@ export default function WeatherApp() {
         description: `Current temperature: ${Math.round(
           weatherResult.main.temp
         )}°C`,
+        style: {
+          backgroundColor: "#F0FDF4", // Light green background
+          borderColor: "#22C55E", // Green border
+          borderWidth: "1px",
+          borderStyle: "solid",
+          color: "#166534", // Dark green text for the title
+        },
+        className: "success-toast", // Add a custom class
       });
     } catch (err) {
       toast.dismiss(loadingId);
@@ -135,7 +143,7 @@ export default function WeatherApp() {
     >
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Weather App</h1>
+          <h1 className="text-2xl font-bold">Weather Now</h1>
           <Button
             variant="outline"
             onClick={toggleDarkMode}
